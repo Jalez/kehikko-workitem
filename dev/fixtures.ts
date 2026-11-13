@@ -46,3 +46,15 @@ export function change(over: Partial<TrackerRow> = {}): TrackerRow {
     ...over,
   }
 }
+
+/** A GitLab-style pipeline: jobs of several stages, some failing, one manual. */
+export function pipelineChecks(): NonNullable<NonNullable<TrackerRow['detail']>['checks']> {
+  return [
+    { name: 'validate:merge-door', state: 'failed', stage: 'validate', url: 'https://gitlab.example.org/o/r/-/jobs/1' },
+    { name: 'validate:lint', state: 'failed', stage: 'validate' },
+    { name: 'validate:types', state: 'success', stage: 'validate' },
+    { name: 'build:workspaces', state: 'success', stage: 'build' },
+    { name: 'test:unit', state: 'success', stage: 'test' },
+    { name: 'test:e2e', state: 'manual', stage: 'test' },
+  ]
+}

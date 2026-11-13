@@ -29,3 +29,10 @@ describe('the manifest', () => {
     expect(PREFERRED_PORT % 10).toBe(0)
   })
 })
+
+describe('the name', () => {
+  test('is Work Item wherever a person reads it', () => {
+    expect(MANIFEST.name).toBe('Work Item')
+    expect(JSON.stringify(MANIFEST)).not.toContain('Work item')
+  })
+})

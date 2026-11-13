@@ -26,7 +26,7 @@ export default defineConfig({
   base: './',
   plugins: [
     serves({ id: ID, prefer: PREFERRED_PORT }),
-    doors({ manifest: MANIFEST, answer, build: BUILD, page: { title: 'Work item', ticket: TICKET } }),
+    doors({ manifest: MANIFEST, answer, build: BUILD, page: { title: 'Work Item', ticket: TICKET } }),
     react(),
     tailwindcss(),
   ],

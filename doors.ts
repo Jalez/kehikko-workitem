@@ -41,7 +41,7 @@ function tools() {
     {
       name: 'shown_item',
       description:
-        'The issue, merge request or pull request Work item is showing the person in a project right now, as last read '
+        'The issue, merge request or pull request Work Item is showing the person in a project right now, as last read '
         + 'from its tracker: its ref, title, state, repository, people, labels, branches, checks, how many comments it has and '
         + 'when it was read. Give the absolute project directory as project. Read-only; nothing is asked of the tracker.',
       /* The context arguments are spelled `project` and `epic` at every module's door (`DOOR_ARGUMENTS`). */
@@ -61,7 +61,7 @@ function call(name: string, args: Record<string, unknown>): string {
     if (!project) throw new Error('Say which project: give its absolute directory as project.')
     const shown = readShown(project)
     return shown === null
-      ? 'Work item is showing nothing in that project: no item is selected there, or its page is not open.'
+      ? 'Work Item is showing nothing in that project: no item is selected there, or its page is not open.'
       : JSON.stringify(shown, null, 2)
   }
   throw new Error(`no tool "${name.slice(0, 60)}" here`)

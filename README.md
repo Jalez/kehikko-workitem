@@ -1,11 +1,11 @@
-# Work item
+# Work Item
 
 One issue, merge request or pull request, shown in full: the one selected on
 the canvas. A Kehikot module (`kehikot.workitem`).
 
 Loading GitHub or GitLab in a page module to read one item is slow and heavy.
 Kehikot already reads trackers with the person's own `gh` / `glab` sign-ins
-(self-hosted GitLab included) and keeps what it read. Work item draws one item
+(self-hosted GitLab included) and keeps what it read. Work Item draws one item
 from that reading, natively:
 
 - title, state, kind, ref and repository;
