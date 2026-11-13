@@ -1,4 +1,4 @@
-# Work item — notes for agents
+# Work Item — notes for agents
 
 - Everything shown comes from the host's tracker reading (`tracker.get`,
   `tracker.refresh`). This module runs no tracker CLI and holds no credential.

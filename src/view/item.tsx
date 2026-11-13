@@ -4,8 +4,11 @@ import type { TrackerCheck, TrackerComment, TrackerRow } from 'kehikot-module-pr
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Ban, Check, CircleSlash, Clock, Hand, Loader, X } from 'lucide-react'
+import { countsWords, groupStages, jobName, overallLine, STATE_WORDS, trouble, type Stage } from '@/item/stages.ts'
 import { linkTarget, markdownHtml } from '@/item/markdown.ts'
-import { PIPELINE_WORDS, ago, kindWord, linkedRefs, stateWord } from '@/item/reading.ts'
+import { ago, kindWord, linkedRefs, stateWord } from '@/item/reading.ts'
 
 /** How many comments are drawn at first, and how many more each press shows. Light on a long thread. */
 export const COMMENT_PAGE = 20
@@ -111,7 +114,7 @@ function Facts({ row }: { row: TrackerRow }) {
     ])
   }
   if (milestone) rows.push(['Milestone', `${milestone.title}${milestone.dueOn ? ` · due ${milestone.dueOn}` : ''}`])
-  if (row.reviewers?.length) rows.push(['Reviewers', row.reviewers.map((r) => `${r.name ?? r.login} (${r.state})`).join(', ')])
+  if (row.kind === 'change') rows.push(['Reviewers', <Reviewers row={row} />])
   if (!rows.length) return null
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs" data-testid="facts">
@@ -123,6 +126,29 @@ function Facts({ row }: { row: TrackerRow }) {
       ))}
     </dl>
   )
+}
+
+/** Each reviewer with where they stand. Always drawn for a change: "None" says it was read and nobody is asked. */
+function Reviewers({ row }: { row: TrackerRow }) {
+  if (!row.reviewers) return <span className="text-muted-foreground">Not read yet</span>
+  if (!row.reviewers.length) return <span className="text-muted-foreground">None</span>
+  return (
+    <ul className="flex flex-wrap gap-x-3 gap-y-0.5" data-testid="reviewers">
+      {row.reviewers.map((r) => (
+        <li key={r.login} className="inline-flex items-center gap-1">
+          <span>{r.name ?? r.login}</span>
+          <span className="text-muted-foreground">{REVIEWER_WORDS[r.state]}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+const REVIEWER_WORDS: Record<NonNullable<TrackerRow['reviewers']>[number]['state'], string> = {
+  approved: '✓ approved',
+  changes: '✕ requested changes',
+  commented: 'commented',
+  requested: 'pending',
 }
 
 function Branches({ row }: { row: TrackerRow }) {
@@ -149,44 +175,125 @@ const DOT: Record<TrackerCheck['state'], string> = {
   manual: 'bg-sky-400',
 }
 
+/** A stage badge's colours by its worst state. The icon and the words carry the state as well. */
+const TONE: Record<TrackerCheck['state'], string> = {
+  success: 'border-emerald-600/40 text-emerald-700 dark:text-emerald-400',
+  failed: 'border-red-600/50 bg-red-500/10 text-red-700 dark:text-red-400',
+  running: 'border-amber-600/50 text-amber-700 dark:text-amber-400',
+  pending: 'border-amber-500/40 text-amber-700 dark:text-amber-400',
+  canceled: 'border-zinc-500/40 text-zinc-600 dark:text-zinc-400',
+  skipped: 'border-zinc-400/40 text-zinc-500',
+  manual: 'border-sky-600/40 text-sky-700 dark:text-sky-400',
+}
+
+const ICON: Record<TrackerCheck['state'], typeof Check> = {
+  success: Check,
+  failed: X,
+  running: Loader,
+  pending: Clock,
+  canceled: Ban,
+  skipped: CircleSlash,
+  manual: Hand,
+}
+
+function StateIcon({ state, className = 'size-3' }: { state: TrackerCheck['state']; className?: string }) {
+  const Icon = ICON[state]
+  return <Icon className={`${className} shrink-0`} aria-hidden />
+}
+
 function Checks({ row, open }: { row: TrackerRow; open: Open }) {
   const checks = row.detail?.checks ?? []
-  /* The failed ones first: what a person opens checks to find. */
-  const ordered = useMemo(() => [...checks].sort((a, b) => Number(b.state === 'failed') - Number(a.state === 'failed')), [checks])
+  const stages = useMemo(() => groupStages(checks), [checks])
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  const toggle = (name: string) =>
+    setExpanded((was) => {
+      const next = new Set(was)
+      if (!next.delete(name)) next.add(name)
+      return next
+    })
+  const line = overallLine(row.pipeline, checks)
   return (
-    <section aria-label="Checks" className="flex flex-col gap-1 text-xs" data-testid="checks">
+    <section aria-label="Checks" className="flex flex-col gap-2 text-xs" data-testid="checks">
       <h2 className="flex items-center gap-2 font-medium">
-        {row.pipeline ? <span className={`inline-block size-2 rounded-full ${DOT[row.pipeline]}`} /> : null}
-        {row.pipeline ? PIPELINE_WORDS[row.pipeline] : 'Checks'}
+        {row.pipeline ? <span className={`inline-block size-2 rounded-full ${DOT[row.pipeline]}`} aria-hidden /> : null}
+        <span data-testid="pipeline-line">{line}</span>
         {row.pipelineUrl ? (
-          <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={() => open(row.pipelineUrl!)}>
-            details
-          </button>
+          <>
+            {' '}
+            <button type="button" className="text-muted-foreground underline-offset-2 hover:underline" onClick={() => open(row.pipelineUrl!)}>
+              Open pipeline
+            </button>
+          </>
         ) : null}
       </h2>
-      {ordered.length ? (
-        <ul className="flex flex-col gap-0.5">
-          {ordered.map((check, i) => (
-            <li key={`${check.name}-${i}`} className="flex items-center gap-2">
-              <span className={`inline-block size-1.5 shrink-0 rounded-full ${DOT[check.state]}`} aria-hidden />
-              {check.url ? (
-                <button type="button" className="truncate text-left underline-offset-2 hover:underline" onClick={() => open(check.url!)}>
-                  {check.stage ? `${check.stage} › ` : ''}
-                  {check.name}
-                </button>
-              ) : (
-                <span className="truncate">
-                  {check.stage ? `${check.stage} › ` : ''}
-                  {check.name}
-                </span>
-              )}
-              <span className="text-muted-foreground ml-auto shrink-0">{check.state}</span>
-            </li>
-          ))}
-          {row.detail?.checksClipped ? <li className="text-muted-foreground">and more on {row.host}</li> : null}
+      {stages.length ? (
+        <ul className="flex flex-wrap gap-1.5" data-testid="stages">
+          {stages.map((stage) => {
+            const isOpen = expanded.has(stage.name)
+            const bad = trouble(stage.counts)
+            const words = countsWords(stage.counts)
+            return (
+              <li key={stage.name} className="flex flex-col">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      data-testid="stage"
+                      data-state-worst={stage.state}
+                      aria-expanded={isOpen}
+                      aria-controls={`stage-${stage.name}`}
+                      aria-label={`${stage.name}: ${words}`}
+                      onClick={() => toggle(stage.name)}
+                      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-medium ${TONE[stage.state]}`}
+                    >
+                      <span>{stage.name}</span>
+                      <StateIcon state={stage.state} />
+                      {bad ? <span className="font-normal">{words}</span> : null}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-80 text-left" data-testid="stage-tip">
+                    <StageJobs stage={stage} />
+                  </TooltipContent>
+                </Tooltip>
+              </li>
+            )
+          })}
         </ul>
       ) : null}
+      {stages.map((stage) =>
+        expanded.has(stage.name) ? (
+          <div key={stage.name} id={`stage-${stage.name}`} className="flex flex-col gap-1" data-testid="stage-jobs">
+            <p className="text-muted-foreground font-medium">{stage.name}</p>
+            <StageJobs stage={stage} open={open} />
+          </div>
+        ) : null,
+      )}
+      {row.detail?.checksClipped ? <p className="text-muted-foreground">and more on {row.host}</p> : null}
     </section>
+  )
+}
+
+/** A stage's jobs with their states, the worst first. Opens a job's link through the host when `open` is given. */
+function StageJobs({ stage, open }: { stage: Stage; open?: Open }) {
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {stage.jobs.map((job, i) => {
+        const name = jobName(job, stage.name)
+        return (
+          <li key={`${job.name}-${i}`} className="flex items-center gap-2" data-testid="job">
+            <StateIcon state={job.state} className="size-3" />
+            {open && job.url ? (
+              <button type="button" className="truncate text-left underline-offset-2 hover:underline" onClick={() => open(job.url!)}>
+                {name}
+              </button>
+            ) : (
+              <span className="truncate">{name}</span>
+            )}
+            <span className="ml-auto shrink-0 opacity-70">{STATE_WORDS[job.state]}</span>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

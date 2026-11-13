@@ -1,9 +1,9 @@
 {
   "name": "kehikko-workitem",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
-  "description": "Work item: one issue, merge request or pull request shown in full, read through the host's tracker reading with the person's own sign-ins. An app: its own page, its own port.",
+  "description": "Work Item: one issue, merge request or pull request shown in full, read through the host's tracker reading with the person's own sign-ins. An app: its own page, its own port.",
   "scripts": {
     "dev": "vite",
     "build": "bun run build.ts",

@@ -156,7 +156,7 @@ export function Screen({ host, api = realApi, pressRef }: { host: Host; api?: Ap
     }
     /* `open` is carried out by the host from the person's click; nothing to do here. */
     if (id === 'open') return
-    return `Work item has nothing called "${id}" to press.`
+    return `Work Item has nothing called "${id}" to press.`
   }
   if (pressRef) pressRef.current = press
 
@@ -170,7 +170,7 @@ export function Screen({ host, api = realApi, pressRef }: { host: Host; api?: Ap
     <div data-kehikot-page className="flex h-screen flex-col text-sm">
       {where === 'unhosted' ? (
         <header className="flex min-h-9 shrink-0 items-center gap-2 border-b px-2 py-1">
-          <span className="text-xs font-medium">Work item</span>
+          <span className="text-xs font-medium">Work Item</span>
           <Suspense fallback={null}>
             <HeaderMenus items={headerNow} onPress={press} />
           </Suspense>
@@ -178,7 +178,7 @@ export function Screen({ host, api = realApi, pressRef }: { host: Host; api?: Ap
       ) : null}
       <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
         {cover ? (
-          <Cover state={cover} name="Work item" onRetry={() => setNow(Date.now())} />
+          <Cover state={cover} name="Work Item" onRetry={() => setNow(Date.now())} />
         ) : !ref ? (
           <Empty recent={recent ?? []} now={now} pick={pick} where={epic ? 'this space' : 'this project'} />
         ) : (

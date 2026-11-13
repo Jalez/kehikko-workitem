@@ -45,22 +45,22 @@ export const MANIFEST: Manifest = manifestSchema.parse({
   kind: MANIFEST_KIND,
   protocol: PROTOCOL,
   id: ID,
-  name: 'Work item',
+  name: 'Work Item',
   icon: 'lucide:git-pull-request',
   version: VERSION,
   dataVersion: 1,
   summary: 'One issue, merge request or pull request in full: description, discussion, checks, branches and links.',
   tags: ['review', 'planning'],
   guidance:
-    'The issue or change selected on this kehikko is shown in full by Work item: its description, its discussion, '
+    'The issue or change selected on this kehikko is shown in full by Work Item: its description, its discussion, '
     + 'its checks and what it links to. Call `shown_item` with the project path to read what the person is looking at '
     + 'before you talk about it, rather than assuming which item they mean.',
   entry: '/app',
-  modes: [{ id: 'item', label: 'Work item', scope: 'part', scopeSays: 'the issue or change picked out, one at a time' }],
+  modes: [{ id: 'item', label: 'Work Item', scope: 'part', scopeSays: 'the issue or change picked out, one at a time' }],
   mcp: {
     url: '/mcp',
     transport: 'http',
-    about: 'What Work item is showing the person: one issue, merge request or pull request. Read-only.',
+    about: 'What Work Item is showing the person: one issue, merge request or pull request. Read-only.',
   },
   extensions: { emits: [], consumes: [] },
   reacts: ['selection', 'tracker'],

@@ -7,5 +7,5 @@ import { buildModule } from 'kehikot-module-protocol/build'
  * where a Vite dev server would not be. The stamp (`dist/.kehikot-built`) is written only after a
  * build from a checkout with no changes to tracked files; `run.sh` keeps Vite for an edited one.
  */
-const built = await buildModule({ dir: import.meta.dirname, page: { title: 'Work item' } })
+const built = await buildModule({ dir: import.meta.dirname, page: { title: 'Work Item' } })
 if (!built.stamped) process.exitCode = 2
