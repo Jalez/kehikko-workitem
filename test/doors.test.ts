@@ -58,7 +58,7 @@ describe('the doors', () => {
   })
 
   test('every tool only reads, says so, and spells the project `project`', () => {
-    const tools = rpc('tools/list').result?.tools as { annotations?: { readOnlyHint?: boolean }; inputSchema: { properties: object } }[]
+    const tools = rpc('tools/list').result?.tools as unknown as { annotations?: { readOnlyHint?: boolean }; inputSchema: { properties: object } }[]
     for (const tool of tools) {
       expect(tool.annotations?.readOnlyHint).toBe(true)
       expect(Object.keys(tool.inputSchema.properties)).toEqual(['project'])

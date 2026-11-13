@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { LIMITS, TRACKER_REFRESH_WITHIN_MS, trackerRefreshResult, type PressValue, type TrackerRow, type TrackerSource } from 'kehikot-module-protocol'
 import { HostRefused } from 'kehikot-module-protocol/client'
 import { Cover, coverFor, useServerStanding } from 'kehikot-module-protocol/client/react'
 
-import { HeaderMenus } from '@/components/header-menus'
 import { clockOf, itemFrom, linkedRefs, offlineLine, readingOf, recentItems, type ItemState } from '@/item/reading.ts'
 import { shownOf } from '@/item/shown.ts'
 import { footerItems, headerItems } from '@/rows.ts'
@@ -14,6 +13,9 @@ import { api as realApi, type Api } from '@/wire/api'
 import { useKehikot, type Host } from '@/wire/use-kehikot'
 
 type Press = { item: string; value?: PressValue }
+
+/* Drawn only when no host frames the page (the host draws the menus otherwise), so loaded only then. */
+const HeaderMenus = lazy(() => import('@/components/header-menus').then((m) => ({ default: m.HeaderMenus })))
 
 /** How often the "3 min ago" words move, while the page is on screen. */
 const TICK_MS = 30_000
@@ -169,7 +171,9 @@ export function Screen({ host, api = realApi, pressRef }: { host: Host; api?: Ap
       {where === 'unhosted' ? (
         <header className="flex min-h-9 shrink-0 items-center gap-2 border-b px-2 py-1">
           <span className="text-xs font-medium">Work item</span>
-          <HeaderMenus items={headerNow} onPress={press} />
+          <Suspense fallback={null}>
+            <HeaderMenus items={headerNow} onPress={press} />
+          </Suspense>
         </header>
       ) : null}
       <main className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
