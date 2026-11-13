@@ -6,7 +6,7 @@
   readers, never in a CLI call here.
 - Read-only: nothing here writes to a tracker.
 - Text from a tracker is text. Markdown goes through `src/item/markdown.ts`
-  (no raw HTML, no dangerous links, no loaded images); every link opens through
+  (no raw HTML, no dangerous links; a picture is never loaded by the page: the host fetches it, `tracker.image`, see `src/item/pictures.ts`); every link opens through
   the host (`openAddress`), never `window.open` or an `<a target>`.
 - The rows: header is how it is set up and what to do, footer is what is going
   on now (`src/rows.ts`). Change a row, then `bun run rows` to rewrite

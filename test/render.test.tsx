@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import type { TrackerRow } from 'kehikot-module-protocol'
@@ -9,6 +9,9 @@ import type { Host } from '../src/wire/use-kehikot.ts'
 import { change, pipelineChecks } from '../dev/fixtures.ts'
 
 afterEach(cleanup)
+
+/** What the host answers a `tracker.image` with; a test sets it. */
+let imageAnswer: (params: Record<string, unknown>) => unknown = () => ({ outcome: 'declined', why: 'host' })
 
 type Asked = { method: string; params: Record<string, unknown> }
 
@@ -31,6 +34,7 @@ function host(rows: TrackerRow[], over: Partial<Host> = {}, refresh: unknown = {
       asked.push({ method, params })
       if (method === 'tracker.refresh') return refresh
       if (method === 'selection.set') return { ok: true }
+      if (method === 'tracker.image') return imageAnswer(params)
       const refs = (params.refs as string[] | undefined) ?? null
       const found = refs ? rows.filter((row) => refs.includes(row.ref)) : rows
       return {
@@ -208,5 +212,116 @@ describe('the pipeline', () => {
     render(<Screen host={host([change({ reviewers: [] })]).value} api={quietApi} />)
     await waitFor(() => screen.getByTestId('facts'))
     expect(screen.getByTestId('facts').textContent).toContain('ReviewersNone')
+  })
+})
+
+const PNG_B64 = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]).toString('base64')
+const withBody = (body: string, over: Partial<TrackerRow> = {}) => change({ ...over, detail: { ...change().detail!, body } })
+
+describe('approvals', () => {
+  test('are shown as "1 of 2" when the tracker has a rule, and not at all when it has none', async () => {
+    const some = change({ detail: { ...change().detail!, approvals: { given: 1, required: 2 } } })
+    const { unmount } = render(<Screen host={host([some]).value} api={quietApi} />)
+    await waitFor(() => screen.getByTestId('facts'))
+    expect(screen.getByTestId('facts').textContent).toContain('Approvals1 of 2')
+    unmount()
+    render(<Screen host={host([change()]).value} api={quietApi} />)
+    await waitFor(() => screen.getByTestId('facts'))
+    expect(screen.getByTestId('facts').textContent).not.toContain('Approvals')
+  })
+})
+
+/** A browser's observer that says what the test decides: every element is in view, or none. */
+let inView = true
+class FakeObserver {
+  constructor(private on: (entries: Array<{ isIntersecting: boolean }>) => void) {}
+  observe() {
+    queueMicrotask(() => this.on([{ isIntersecting: inView }]))
+  }
+  disconnect() {}
+  unobserve() {}
+}
+
+describe('pictures', () => {
+  const realObserver = globalThis.IntersectionObserver
+  beforeEach(() => {
+    inView = true
+    globalThis.IntersectionObserver = FakeObserver as never
+  })
+  afterEach(() => {
+    globalThis.IntersectionObserver = realObserver
+  })
+
+  test('one scrolled out of view is not asked for until it is near', async () => {
+    inView = false
+    imageAnswer = () => ({ outcome: 'image', mime: 'image/png', base64: PNG_B64 })
+    const h = host([withBody(`![far down](${'https://github.com/owner/repo/assets/1/far.png'})`)])
+    render(<Screen host={h.value} api={quietApi} />)
+    await screen.findByTestId('picture-waiting')
+    expect(h.asked.some((a) => a.method === 'tracker.image')).toBe(false)
+  })
+
+  const url = 'https://github.com/owner/repo/assets/1/shot.png'
+  const md = (u = url) => `Look:\n\n![the screenshot](${u})`
+
+  test('are fetched through the host, never loaded by the page, and keep their alt text', async () => {
+    imageAnswer = () => ({ outcome: 'image', mime: 'image/png', base64: PNG_B64 })
+    const h = host([withBody(md())])
+    const { container } = render(<Screen host={h.value} api={quietApi} />)
+    const img = await waitFor(() => {
+      const found = container.querySelector('img')
+      if (!found) throw new Error('not yet')
+      return found
+    })
+    expect(img.getAttribute('alt')).toBe('the screenshot')
+    expect(img.getAttribute('src')).toStartWith('blob:')
+    expect(h.asked.filter((a) => a.method === 'tracker.image')).toEqual([{ method: 'tracker.image', params: { ref: 'gh#5', url } }])
+    expect([...container.querySelectorAll('img')].some((i) => i.getAttribute('src') === url)).toBe(false)
+  })
+
+  test('a relative address is read against the item\'s page before the host is asked', async () => {
+    imageAnswer = () => ({ outcome: 'declined', why: 'host' })
+    const h = host([withBody(md('/uploads/abc/shot.png'))])
+    render(<Screen host={h.value} api={quietApi} />)
+    await waitFor(() => expect(h.asked.some((a) => a.method === 'tracker.image')).toBe(true))
+    const asked = h.asked.find((a) => a.method === 'tracker.image')!.params.url as string
+    expect(asked).toBe(new URL('/uploads/abc/shot.png', change().url).href)
+  })
+
+  test('what the host will not fetch stays a link with its host shown, and opens through the host', async () => {
+    imageAnswer = () => ({ outcome: 'declined', why: 'host' })
+    const h = host([withBody(md('https://tracker.example.net/pixel.png'))])
+    render(<Screen host={h.value} api={quietApi} />)
+    const link = await screen.findByTestId('picture-link')
+    expect(link.textContent).toContain('the screenshot')
+    expect(link.parentElement!.textContent).toContain('tracker.example.net')
+    fireEvent.click(link)
+    expect(h.opened).toEqual(['https://tracker.example.net/pixel.png'])
+  })
+
+  test('one too big, of the wrong type or unreadable stays a link, and an http address is never asked for', async () => {
+    for (const why of ['size', 'type', 'unreadable']) {
+      imageAnswer = () => ({ outcome: 'declined', why })
+      const h = host([withBody(md())])
+      const { unmount } = render(<Screen host={h.value} api={quietApi} />)
+      await screen.findByTestId('picture-link')
+      unmount()
+    }
+    imageAnswer = () => ({ outcome: 'image', mime: 'image/png', base64: PNG_B64 })
+    const h = host([withBody(md('http://example.org/a.png'))])
+    render(<Screen host={h.value} api={quietApi} />)
+    await waitFor(() => screen.getByTestId('title'))
+    expect(h.asked.some((a) => a.method === 'tracker.image')).toBe(false)
+  })
+
+  test('a thumbnail opens a full-size view that Escape closes', async () => {
+    imageAnswer = () => ({ outcome: 'image', mime: 'image/png', base64: PNG_B64 })
+    render(<Screen host={host([withBody(md())]).value} api={quietApi} />)
+    const open = await screen.findByRole('button', { name: 'Open image: the screenshot' })
+    fireEvent.click(open)
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.querySelector('[data-testid="lightbox-image"]')?.getAttribute('alt')).toBe('the screenshot')
+    fireEvent.keyDown(dialog, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })

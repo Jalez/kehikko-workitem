@@ -5,6 +5,7 @@ import { HostRefused } from 'kehikot-module-protocol/client'
 import { Cover, coverFor, useServerStanding } from 'kehikot-module-protocol/client/react'
 
 import { clockOf, itemFrom, linkedRefs, offlineLine, readingOf, recentItems, type ItemState } from '@/item/reading.ts'
+import { Pictures, browserIo } from '@/item/pictures.ts'
 import { shownOf } from '@/item/shown.ts'
 import { footerItems, headerItems } from '@/rows.ts'
 import { Empty } from '@/view/empty.tsx'
@@ -49,6 +50,10 @@ export function Screen({ host, api = realApi, pressRef }: { host: Host; api?: Ap
   const [refreshFailed, setRefreshFailed] = useState<string | null>(null)
   const [refused, setRefused] = useState<string | null>(null)
   const [now, setNow] = useState(() => Date.now())
+
+  /* The pictures in the item's text: asked of the host, a few at a time, a dozen decoded at once. */
+  const pictures = useMemo(() => new Pictures(browserIo((method, params) => request(method, params))), [request])
+  useEffect(() => () => pictures.clear(), [pictures, ref])
 
   const shown = item && item.ref === ref ? item : null
   const row = shown?.at === 'shown' ? shown.row : null
@@ -190,7 +195,7 @@ export function Screen({ host, api = realApi, pressRef }: { host: Host; api?: Ap
             ) : null}
             {refused ? <p className="text-muted-foreground text-xs">{refused}</p> : null}
             {shown?.at === 'shown' ? (
-              <ItemView row={shown.row} linked={linked} now={now} open={open} detailPending={!shown.row.detail && busy} />
+              <ItemView row={shown.row} linked={linked} now={now} open={open} detailPending={!shown.row.detail && busy} pictures={pictures} />
             ) : shown?.at === 'missing' ? (
               <p data-testid="missing">
                 <span className="font-mono">{shown.ref}</span>: {shown.why}
