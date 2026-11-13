@@ -1,0 +1,300 @@
+[
+  {
+    "name": "nothing selected",
+    "header": [],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "item",
+        "text": "Nothing selected",
+        "level": "normal",
+        "align": "start",
+        "optional": false
+      }
+    ],
+    "state": true
+  },
+  {
+    "name": "reading one",
+    "header": [
+      {
+        "kind": "run",
+        "id": "refresh",
+        "label": "Refresh",
+        "icon": "refresh",
+        "agents": true,
+        "state": "busy",
+        "result": null,
+        "disabled": "It is being read now.",
+        "confirm": false,
+        "pinned": true
+      }
+    ],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "item",
+        "text": "gh#5",
+        "level": "normal",
+        "align": "start",
+        "optional": false
+      },
+      {
+        "kind": "text",
+        "id": "fresh",
+        "text": "Reading…",
+        "level": "normal",
+        "align": "end",
+        "optional": false
+      }
+    ],
+    "state": true
+  },
+  {
+    "name": "one shown",
+    "header": [
+      {
+        "kind": "run",
+        "id": "refresh",
+        "label": "Refresh",
+        "icon": "refresh",
+        "agents": true,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "pinned": true
+      },
+      {
+        "kind": "run",
+        "id": "open",
+        "label": "Open on github.com",
+        "icon": "external",
+        "agents": false,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "open": "https://github.com/owner/repo/pull/5"
+      }
+    ],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "item",
+        "text": "gh#5 · Open",
+        "level": "normal",
+        "align": "start",
+        "optional": false,
+        "tooltip": "Pull request gh#5 in owner/repo: Read one item without a browser"
+      },
+      {
+        "kind": "text",
+        "id": "pipeline",
+        "text": "Checks failed",
+        "level": "critical",
+        "align": "start",
+        "optional": true
+      },
+      {
+        "kind": "text",
+        "id": "fresh",
+        "text": "updated 3 min ago",
+        "level": "normal",
+        "align": "end",
+        "optional": true,
+        "tooltip": "Last changed on github.com; read 3 min ago."
+      }
+    ],
+    "state": true
+  },
+  {
+    "name": "several selected",
+    "header": [
+      {
+        "kind": "switch",
+        "id": "item",
+        "label": "Item",
+        "agents": false,
+        "options": [
+          {
+            "id": "gh#5",
+            "label": "gh#5"
+          },
+          {
+            "id": "gh#6",
+            "label": "gh#6"
+          }
+        ],
+        "value": "gh#5"
+      },
+      {
+        "kind": "run",
+        "id": "refresh",
+        "label": "Refresh",
+        "icon": "refresh",
+        "agents": true,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "pinned": true
+      },
+      {
+        "kind": "run",
+        "id": "open",
+        "label": "Open on github.com",
+        "icon": "external",
+        "agents": false,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "open": "https://github.com/owner/repo/pull/5"
+      }
+    ],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "item",
+        "text": "gh#5 · Open",
+        "level": "normal",
+        "align": "start",
+        "optional": false,
+        "tooltip": "Pull request gh#5 in owner/repo: Read one item without a browser"
+      },
+      {
+        "kind": "text",
+        "id": "pipeline",
+        "text": "Checks failed",
+        "level": "critical",
+        "align": "start",
+        "optional": true
+      },
+      {
+        "kind": "text",
+        "id": "fresh",
+        "text": "updated 3 min ago",
+        "level": "normal",
+        "align": "end",
+        "optional": true,
+        "tooltip": "Last changed on github.com; read 3 min ago."
+      }
+    ],
+    "state": true
+  },
+  {
+    "name": "refreshing",
+    "header": [
+      {
+        "kind": "run",
+        "id": "refresh",
+        "label": "Refresh",
+        "icon": "refresh",
+        "agents": true,
+        "state": "busy",
+        "result": null,
+        "disabled": "It is being read now.",
+        "confirm": false,
+        "pinned": true
+      },
+      {
+        "kind": "run",
+        "id": "open",
+        "label": "Open on github.com",
+        "icon": "external",
+        "agents": false,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "open": "https://github.com/owner/repo/pull/5"
+      }
+    ],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "item",
+        "text": "gh#5 · Open",
+        "level": "normal",
+        "align": "start",
+        "optional": false,
+        "tooltip": "Pull request gh#5 in owner/repo: Read one item without a browser"
+      },
+      {
+        "kind": "text",
+        "id": "pipeline",
+        "text": "Checks failed",
+        "level": "critical",
+        "align": "start",
+        "optional": true
+      },
+      {
+        "kind": "text",
+        "id": "fresh",
+        "text": "Refreshing…",
+        "level": "normal",
+        "align": "end",
+        "optional": true
+      }
+    ],
+    "state": true
+  },
+  {
+    "name": "offline",
+    "header": [
+      {
+        "kind": "run",
+        "id": "refresh",
+        "label": "Refresh",
+        "icon": "refresh",
+        "agents": true,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "pinned": true
+      },
+      {
+        "kind": "run",
+        "id": "open",
+        "label": "Open on github.com",
+        "icon": "external",
+        "agents": false,
+        "state": "idle",
+        "result": null,
+        "disabled": null,
+        "confirm": false,
+        "open": "https://github.com/owner/repo/pull/5"
+      }
+    ],
+    "footer": [
+      {
+        "kind": "text",
+        "id": "item",
+        "text": "gh#5 · Open",
+        "level": "normal",
+        "align": "start",
+        "optional": false,
+        "tooltip": "Pull request gh#5 in owner/repo: Read one item without a browser"
+      },
+      {
+        "kind": "text",
+        "id": "pipeline",
+        "text": "Checks failed",
+        "level": "critical",
+        "align": "start",
+        "optional": true
+      },
+      {
+        "kind": "text",
+        "id": "fresh",
+        "text": "Offline: showing what was read at 12:03",
+        "level": "warn",
+        "align": "end",
+        "optional": false
+      }
+    ],
+    "state": true
+  }
+]

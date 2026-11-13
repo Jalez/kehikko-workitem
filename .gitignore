@@ -1,0 +1,12 @@
+# Renamed to .gitignore by `create`; a package drops dotfiles named .gitignore.
+#
+# No trailing slash: a symlinked node_modules (a linked local dependency) is not
+# a directory, and `node_modules/` would let the link be committed.
+node_modules
+
+# The build (`bun run build`). Served only when its stamp is the commit checked
+# out (run.sh, serve.ts); a checked-in copy would be a second answer.
+dist
+
+# Written by `build.ts` for the length of a build and taken away after.
+/index.html
