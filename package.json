@@ -26,7 +26,7 @@
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "kehikot-module-protocol": "git+https://github.com/Jalez/kehikko-protocol.git#38ae10ed8941b4a0e1191ccc27a4cd4d5a76088b",
+    "kehikot-module-protocol": "git+https://github.com/Jalez/kehikko-protocol.git#v2.98.0",
     "tailwind-merge": "^3.6.0",
     "zod": "^3.23.8",
     "micromark": "^4.0.2",
