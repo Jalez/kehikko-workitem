@@ -1,7 +1,8 @@
-import { memo, useMemo, useState, type MouseEvent } from 'react'
+import { memo, useMemo, useRef, useState, type MouseEvent } from 'react'
 
 import type { TrackerCheck, TrackerComment, TrackerRow } from 'kehikot-module-protocol'
 
+import { PictureProvider, PictureSlots, usePictureScope, useSlots, type PictureScope } from '@/view/pictures.tsx'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -26,6 +27,7 @@ export function ItemView({
   now,
   open,
   detailPending,
+  pictures,
 }: {
   row: TrackerRow
   /** Summary rows of the items this one links to, as far as the reading has them. */
@@ -34,9 +36,13 @@ export function ItemView({
   open: Open
   /** The detail is being read and is not here yet. */
   detailPending: boolean
+  /** Where the pictures in the text come from; none draws them as links. */
+  pictures?: PictureScope['pictures']
 }) {
   const d = row.detail
+  const scope = useMemo(() => (pictures ? { itemRef: row.ref, pictures } : null), [pictures, row.ref])
   return (
+    <PictureProvider value={scope}>
     <article className="flex flex-col gap-4" data-testid="item">
       <header className="flex flex-col gap-1">
         <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
@@ -79,6 +85,7 @@ export function ItemView({
 
       {d?.comments ? <Discussion row={row} comments={d.comments} total={d.commentCount} now={now} open={open} /> : null}
     </article>
+    </PictureProvider>
   )
 }
 
@@ -115,6 +122,8 @@ function Facts({ row }: { row: TrackerRow }) {
   }
   if (milestone) rows.push(['Milestone', `${milestone.title}${milestone.dueOn ? ` · due ${milestone.dueOn}` : ''}`])
   if (row.kind === 'change') rows.push(['Reviewers', <Reviewers row={row} />])
+  const approvals = row.detail?.approvals
+  if (row.kind === 'change' && approvals) rows.push(['Approvals', `${approvals.given} of ${approvals.required}`])
   if (!rows.length) return null
   return (
     <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs" data-testid="facts">
@@ -387,12 +396,21 @@ const Comment = memo(function Comment({ comment, base, now, open }: { comment: T
 /** Markdown, rendered once per text; a press on a link goes to the host. */
 export const Markdown = memo(function Markdown({ text, base, open }: { text: string; base: string; open: Open }) {
   const html = useMemo(() => markdownHtml(text), [text])
+  const scope = usePictureScope()
+  const root = useRef<HTMLDivElement>(null)
+  const slots = useSlots(root, html, base, scope)
   const onClick = (event: MouseEvent<HTMLDivElement>) => {
+    /* Not a press inside the full-size view, which is not text. */
     const link = (event.target as HTMLElement).closest('a')
     if (!link) return
     event.preventDefault()
     const target = linkTarget(link.getAttribute('href'), base)
     if (target) open(target)
   }
-  return <div className="markdown text-sm break-words" onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} />
+  return (
+    <div className="text-sm break-words" onClick={onClick}>
+      <div ref={root} className="markdown" dangerouslySetInnerHTML={{ __html: html }} />
+      {scope ? <PictureSlots slots={slots} scope={scope} /> : null}
+    </div>
+  )
 })

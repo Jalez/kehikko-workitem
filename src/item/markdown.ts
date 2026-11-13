@@ -8,9 +8,11 @@ import { gfm, gfmHtml } from 'micromark-extension-gfm'
  *   `<script>`, an `<iframe>` or an `onerror=` arrives as words on the screen.
  * - No dangerous links: micromark keeps only safe protocols (`allowDangerousProtocol` stays off),
  *   so a `javascript:` link has no address.
- * - No images loaded: a picture in an item is often behind the tracker's sign-in, and loading it
- *   from here would tell a stranger's server who is reading. Each becomes a link with its alt
- *   text, which the person can open.
+ * - No image loaded by this page: a picture in an item is often behind the tracker's sign-in, and
+ *   loading it from here would tell a stranger's server who is reading. Each becomes a `span.md-image`
+ *   holding a link with its alt text (what stays when nothing better can be shown), and carrying the
+ *   address and alt text as data. The page asks the HOST for the bytes (`src/item/pictures.ts`),
+ *   which fetches only from the item's own tracker.
  * - No link is followed by this page: `linkTarget` decides where a press goes (the host's
  *   address rules), and a relative one is read against the item's own page.
  */
@@ -19,10 +21,17 @@ export function markdownHtml(text: string): string {
   const shell = document.createElement('template')
   shell.innerHTML = html
   for (const img of [...shell.content.querySelectorAll('img')]) {
+    const src = img.getAttribute('src') ?? ''
+    const alt = img.getAttribute('alt') ?? ''
+    const slot = document.createElement('span')
+    slot.className = 'md-image'
+    slot.setAttribute('data-src', src)
+    slot.setAttribute('data-alt', alt)
     const link = document.createElement('a')
-    link.setAttribute('href', img.getAttribute('src') ?? '')
-    link.textContent = `🖼 ${img.getAttribute('alt') || 'image'}`
-    img.replaceWith(link)
+    link.setAttribute('href', src)
+    link.textContent = `🖼 ${alt || 'image'}`
+    slot.append(link)
+    img.replaceWith(slot)
   }
   return shell.innerHTML
 }
