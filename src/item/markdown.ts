@@ -29,7 +29,7 @@ const pictureHtml: HtmlExtension = {
   },
 }
 
-function rawHtml(this: CompileContext, token: Token) {
+function rawHtml(this: CompileContext, token: Token): undefined {
   const text = this.sliceSerialize(token)
   let out = ''
   let at = 0
