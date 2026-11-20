@@ -97,3 +97,32 @@ describe('where a link goes', () => {
     expect(linkTarget(null, base)).toBeNull()
   })
 })
+
+describe('an HTML comment', () => {
+  test('is left out, on one line or many, as the tracker leaves it out; in code it is code', () => {
+    const box = document.createElement('div')
+    box.innerHTML = markdownHtml('<!-- marker:v1 -->\n<!-- a\nlonger one -->\n\nSaid <!-- hidden --> aloud.\n\n`<!-- kept -->`')
+    expect(box.textContent).not.toContain('marker')
+    expect(box.textContent).not.toContain('longer one')
+    expect(box.textContent).not.toContain('hidden')
+    expect(box.textContent).toContain('Said  aloud.')
+    expect(box.textContent).toContain('<!-- kept -->')
+  })
+})
+
+describe('a picture inside a link', () => {
+  test('is the link\'s words, its alt text once, never a link in a link', () => {
+    const box = document.createElement('div')
+    box.innerHTML = markdownHtml("[![New Issues](https://scan.example/new.svg 'New Issues')](https://scan.example/issues)")
+    expect(box.querySelector('a a')).toBeNull()
+    expect(box.querySelectorAll('a')).toHaveLength(1)
+    expect(box.querySelector('a')!.getAttribute('href')).toBe('https://scan.example/issues')
+    expect(box.querySelector('span.md-image')!.hasAttribute('data-in-link')).toBe(true)
+    expect(box.textContent).toBe('New Issues')
+  })
+  test('alone, it is a link to the picture saying its alt text, with no mark before it', () => {
+    const box = document.createElement('div')
+    box.innerHTML = markdownHtml('![chart](https://scan.example/c.png)')
+    expect(box.textContent).toBe('chart')
+  })
+})

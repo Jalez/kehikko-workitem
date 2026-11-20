@@ -6,8 +6,9 @@ import { PictureProvider, PictureSlots, usePictureScope, useSlots, type PictureS
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Ban, Check, CircleSlash, Clock, Hand, Loader, X } from 'lucide-react'
+import { Ban, Bot, Check, ChevronRight, CircleSlash, Clock, FileCode, Hand, Loader, X } from 'lucide-react'
 import { countsWords, groupStages, jobName, overallLine, STATE_WORDS, trouble, type Stage } from '@/item/stages.ts'
+import { arrange, compact, leadOf, markOf, shortPath, summaryOf, type Entry } from '@/item/discussion.ts'
 import { linkTarget, markdownHtml } from '@/item/markdown.ts'
 import { ago, kindWord, linkedRefs, stateWord } from '@/item/reading.ts'
 
@@ -342,8 +343,9 @@ function MoreOn({ row, open, words }: { row: TrackerRow; open: Open; words: stri
 
 function Discussion({ row, comments, total, now, open }: { row: TrackerRow; comments: readonly TrackerComment[]; total?: number; now: number; open: Open }) {
   const [showing, setShowing] = useState(COMMENT_PAGE)
-  const drawn = comments.slice(-showing)
-  const hiddenHere = comments.length - drawn.length
+  const entries = useMemo(() => arrange(comments), [comments])
+  const drawn = entries.slice(-showing)
+  const hiddenHere = entries.length - drawn.length
   const elsewhere = Math.max(0, (total ?? comments.length) - comments.length)
   return (
     <section aria-label="Discussion" className="flex flex-col gap-2" data-testid="discussion">
@@ -358,40 +360,184 @@ function Discussion({ row, comments, total, now, open }: { row: TrackerRow; comm
         <MoreOn row={row} open={open} words={`${elsewhere} earlier ${elsewhere === 1 ? 'comment is' : 'comments are'}`} />
       ) : null}
       {comments.length === 0 ? <p className="text-muted-foreground text-xs italic">No comments yet.</p> : null}
-      <ol className="flex flex-col gap-3">
-        {drawn.map((c) => (
-          <Comment key={c.id} comment={c} base={row.url} now={now} open={open} />
-        ))}
+      <ol className="flex flex-col gap-2">
+        {drawn.map((entry) =>
+          compact(entry) ? (
+            <Folded key={entry.comment.id} entry={entry} base={row.url} now={now} open={open} />
+          ) : (
+            <Comment key={entry.comment.id} comment={entry.comment} base={row.url} now={now} open={open} />
+          ),
+        )}
       </ol>
     </section>
   )
 }
 
 const VERDICT = { approved: 'approved', changes: 'asked for changes', commented: 'reviewed' } as const
+const VERDICT_TONE = {
+  approved: 'border-emerald-600/40 text-emerald-700 dark:text-emerald-400',
+  changes: 'border-red-600/50 text-red-700 dark:text-red-400',
+  commented: '',
+} as const
 
-const Comment = memo(function Comment({ comment, base, now, open }: { comment: TrackerComment; base: string; now: number; open: Open }) {
-  const who = comment.name ?? comment.login ?? 'Somebody'
+const whoOf = (c: TrackerComment) => c.name ?? c.login ?? 'Somebody'
+
+/** An author's mark: their initial on a colour of their own, or a robot for an account that is not a person. */
+function Mark({ who, bot, small }: { who: string; bot?: boolean; small?: boolean }) {
+  const size = small ? 'size-4 text-[0.6rem]' : 'size-5 text-[0.65rem]'
+  if (bot) {
+    return (
+      <span className={`bg-muted text-muted-foreground inline-flex shrink-0 items-center justify-center rounded-full ${size}`} aria-hidden>
+        <Bot className="size-3" />
+      </span>
+    )
+  }
+  const { letter, hue } = markOf(who)
   return (
-    <li className="border-l-2 pl-2" data-testid="comment">
-      <p className="text-muted-foreground text-xs">
-        <span className="text-foreground font-medium">{who}</span>
-        {comment.kind === 'review' ? ` ${VERDICT[comment.verdict ?? 'commented']}` : comment.kind === 'line' ? ' on ' : ''}
-        {comment.kind === 'line' && comment.path ? <span className="font-mono">{comment.path}</span> : null}
-        {' · '}
-        {comment.url ? (
-          <button type="button" className="underline-offset-2 hover:underline" onClick={() => open(comment.url!)} title={comment.at}>
-            {ago(comment.at, now)}
-          </button>
-        ) : (
-          <time dateTime={comment.at}>{ago(comment.at, now)}</time>
-        )}
-        {comment.editedAt ? ' · edited' : ''}
-      </p>
-      <Markdown text={comment.body} base={base} open={open} />
-      {comment.bodyClipped ? <p className="text-muted-foreground text-xs">…the rest is on the tracker.</p> : null}
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white ${size}`}
+      style={{ background: `oklch(0.55 0.1 ${hue})` }}
+      aria-hidden
+    >
+      {letter}
+    </span>
+  )
+}
+
+/** When it was written, as a press to it on its tracker where there is an address. */
+function When({ comment, now, open }: { comment: TrackerComment; now: number; open: Open }) {
+  const words = `${ago(comment.at, now)}${comment.editedAt ? ' · edited' : ''}`
+  return comment.url ? (
+    <button type="button" className="text-muted-foreground shrink-0 underline-offset-2 hover:underline" onClick={() => open(comment.url!)} title={comment.at}>
+      {words}
+    </button>
+  ) : (
+    <time className="text-muted-foreground shrink-0" dateTime={comment.at}>
+      {words}
+    </time>
+  )
+}
+
+/** The file a comment on a line is on: shortened, the whole path on hover, a press to the comment where the tracker gave its address. */
+export function FileChip({ path, url, open }: { path: string; url?: string; open: Open }) {
+  const chip = 'bg-muted text-foreground inline-flex max-w-full min-w-0 items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[0.7rem]'
+  const inner = (
+    <>
+      <FileCode className="size-3 shrink-0 opacity-70" aria-hidden />
+      <span className="truncate">{shortPath(path)}</span>
+    </>
+  )
+  return url ? (
+    <button type="button" className={`${chip} hover:bg-accent`} title={path} aria-label={`On ${path}`} onClick={() => open(url)} data-testid="file-chip">
+      {inner}
+    </button>
+  ) : (
+    <span className={chip} title={path} aria-label={`On ${path}`} data-testid="file-chip">
+      {inner}
+    </span>
+  )
+}
+
+/** A person's comment, as a card: who, on what, when, and what they said under it. */
+const Comment = memo(function Comment({ comment, base, now, open }: { comment: TrackerComment; base: string; now: number; open: Open }) {
+  const who = whoOf(comment)
+  const lead = leadOf(comment.body)
+  return (
+    <li className="bg-card overflow-hidden rounded-lg border" data-testid="comment">
+      <div className="bg-muted/40 flex flex-wrap items-center gap-x-2 gap-y-1 border-b px-2.5 py-1.5 text-xs">
+        <Mark who={who} />
+        <span className="font-medium" data-testid="comment-author">
+          {who}
+        </span>
+        {comment.kind === 'review' ? (
+          <Badge variant="outline" className={VERDICT_TONE[comment.verdict ?? 'commented']}>
+            {VERDICT[comment.verdict ?? 'commented']}
+          </Badge>
+        ) : null}
+        {comment.kind === 'line' && comment.path ? <FileChip path={comment.path} url={comment.url} open={open} /> : null}
+        <span className="ml-auto" />
+        <When comment={comment} now={now} open={open} />
+      </div>
+      <div className="px-2.5 py-2">
+        {lead ? (
+          <Badge variant="outline" className="mb-1.5 font-semibold" data-testid="comment-lead">
+            {lead.label}
+          </Badge>
+        ) : null}
+        <Markdown text={lead ? lead.rest : comment.body} base={base} open={open} />
+        {comment.bodyClipped ? <p className="text-muted-foreground mt-1 text-xs">…the rest is on the tracker.</p> : null}
+      </div>
     </li>
   )
 })
+
+/**
+ * A bot's comment, or one that repeats: one quiet line saying who and the gist, opened with a press.
+ * The ones before it that look just like it are under it, "4 earlier like this".
+ */
+function Folded({ entry, base, now, open }: { entry: Entry; base: string; now: number; open: Open }) {
+  const [earlier, setEarlier] = useState(false)
+  const n = entry.earlier.length
+  return (
+    <li className="flex flex-col gap-1" data-testid="folded">
+      <FoldedLine comment={entry.comment} bot={entry.bot} base={base} now={now} open={open} />
+      {n > 0 ? (
+        <button
+          type="button"
+          className="text-muted-foreground self-start pl-7 text-xs underline-offset-2 hover:underline"
+          aria-expanded={earlier}
+          onClick={() => setEarlier((e) => !e)}
+          data-testid="earlier-like-this"
+        >
+          {earlier ? `Hide the ${n} earlier like this` : `${n} earlier like this`}
+        </button>
+      ) : null}
+      {earlier ? (
+        <ol className="flex flex-col gap-1 pl-5" data-testid="earlier">
+          {[...entry.earlier].reverse().map((c) => (
+            <li key={c.id}>
+              <FoldedLine comment={c} bot={entry.bot} base={base} now={now} open={open} />
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </li>
+  )
+}
+
+/** One folded comment: a line with its gist, and its whole text under it once pressed. */
+function FoldedLine({ comment, bot, base, now, open }: { comment: TrackerComment; bot: boolean; base: string; now: number; open: Open }) {
+  const [opened, setOpened] = useState(false)
+  const who = whoOf(comment)
+  const gist = summaryOf(comment.body) || 'No words'
+  return (
+    <div className="text-muted-foreground rounded-md border border-dashed text-xs" data-testid="folded-comment" data-bot={bot ? '' : undefined}>
+      <div className="flex min-w-0 items-center gap-2 px-2 py-1">
+        <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" aria-expanded={opened} onClick={() => setOpened((o) => !o)}>
+          <ChevronRight className={`size-3 shrink-0 transition-transform ${opened ? 'rotate-90' : ''}`} aria-hidden />
+          <Mark who={who} bot={bot} small />
+          <span className="text-foreground/80 shrink-0 font-medium">{who}</span>
+          {bot ? <span className="shrink-0 rounded border px-1 text-[0.6rem] tracking-wide uppercase">bot</span> : null}
+          {comment.kind === 'line' && comment.path ? (
+            <span className="shrink-0 font-mono" title={comment.path}>
+              {shortPath(comment.path)}
+            </span>
+          ) : null}
+          <span className="min-w-0 truncate" data-testid="folded-gist">
+            {gist}
+          </span>
+        </button>
+        <When comment={comment} now={now} open={open} />
+      </div>
+      {opened ? (
+        <div className="text-foreground border-t border-dashed px-2.5 py-2" data-testid="folded-body">
+          <Markdown text={comment.body} base={base} open={open} />
+          {comment.bodyClipped ? <p className="text-muted-foreground mt-1 text-xs">…the rest is on the tracker.</p> : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
 
 /** Markdown, rendered once per text; a press on a link goes to the host. */
 export const Markdown = memo(function Markdown({ text, base, open }: { text: string; base: string; open: Open }) {

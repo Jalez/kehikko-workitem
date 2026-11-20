@@ -1,6 +1,6 @@
 {
   "name": "kehikko-workitem",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "type": "module",
   "description": "Work Item: one issue, merge request or pull request shown in full, read through the host's tracker reading with the person's own sign-ins. An app: its own page, its own port.",

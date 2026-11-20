@@ -10,3 +10,6 @@ dist
 
 # Written by `build.ts` for the length of a build and taken away after.
 /index.html
+
+# Rows saved locally for the preview page (dev/preview), never committed.
+dev/preview/*.local.json

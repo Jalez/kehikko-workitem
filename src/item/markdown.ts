@@ -29,8 +29,35 @@ const pictureHtml: HtmlExtension = {
   },
 }
 
+/** Whether the raw HTML being read is inside an HTML comment that began on an earlier line. */
+let inComment = false
+
+/**
+ * The text with its HTML comments taken out. A tracker never shows them (bots hide their markers in
+ * them), so neither does this page. A comment may run over several lines, each its own piece here.
+ */
+function uncommented(text: string): string {
+  let out = ''
+  let at = 0
+  while (at < text.length) {
+    if (inComment) {
+      const end = text.indexOf('-->', at)
+      if (end < 0) return out
+      inComment = false
+      at = end + 3
+    } else {
+      const start = text.indexOf('<!--', at)
+      if (start < 0) return out + text.slice(at)
+      out += text.slice(at, start)
+      inComment = true
+      at = start + 4
+    }
+  }
+  return out
+}
+
 function rawHtml(this: CompileContext, token: Token): undefined {
-  const text = this.sliceSerialize(token)
+  const text = uncommented(this.sliceSerialize(token))
   let out = ''
   let at = 0
   for (const m of text.matchAll(/<[^<>]*>/g)) {
@@ -54,18 +81,20 @@ function rawHtml(this: CompileContext, token: Token): undefined {
  *
  * - No raw HTML: micromark escapes every tag in the text (`allowDangerousHtml` stays off), so a
  *   `<script>`, an `<iframe>` or an `onerror=` arrives as words on the screen. The one exception is
- *   a picture's `<img>`, rebuilt from its address and alt text alone (`pictureHtml`).
+ *   a picture's `<img>`, rebuilt from its address and alt text alone (`pictureHtml`). An HTML
+ *   comment (`<!-- … -->`) is left out, as the tracker leaves it out.
  * - No dangerous links: micromark keeps only safe protocols (`allowDangerousProtocol` stays off),
  *   so a `javascript:` link has no address.
  * - No image loaded by this page: a picture in an item is often behind the tracker's sign-in, and
  *   loading it from here would tell a stranger's server who is reading. Each becomes a `span.md-image`
- *   holding a link with its alt text (what stays when nothing better can be shown), and carrying the
- *   address and alt text as data. The page asks the HOST for the bytes (`src/item/pictures.ts`),
+ *   holding its alt text once — a link to the picture, or plain words when the picture is already
+ *   inside a link — and carrying the address and alt text as data. The page asks the HOST for the bytes (`src/item/pictures.ts`),
  *   which fetches only from the item's own tracker.
  * - No link is followed by this page: `linkTarget` decides where a press goes (the host's
  *   address rules), and a relative one is read against the item's own page.
  */
 export function markdownHtml(text: string): string {
+  inComment = false
   const html = micromark(text, { extensions: [gfm()], htmlExtensions: [gfmHtml(), pictureHtml] })
   const shell = document.createElement('template')
   shell.innerHTML = html
@@ -76,10 +105,17 @@ export function markdownHtml(text: string): string {
     slot.className = 'md-image'
     slot.setAttribute('data-src', src)
     slot.setAttribute('data-alt', alt)
-    const link = document.createElement('a')
-    link.setAttribute('href', src)
-    link.textContent = `🖼 ${alt || 'image'}`
-    slot.append(link)
+    /* Inside a link (a badge that links somewhere), the alt text is that link's words: a link in a
+       link is no HTML at all, and a browser reading one splits it in two, saying the label twice. */
+    if (img.closest('a')) {
+      slot.setAttribute('data-in-link', '')
+      slot.textContent = alt || 'image'
+    } else {
+      const link = document.createElement('a')
+      link.setAttribute('href', src)
+      link.textContent = alt || 'image'
+      slot.append(link)
+    }
     img.replaceWith(slot)
   }
   return shell.innerHTML
