@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
-import type { TrackerRow } from 'kehikot-module-protocol'
+import type { TrackerComment, TrackerRow } from 'kehikot-module-protocol'
 
 import { Screen } from '../src/app.tsx'
 import type { Api } from '../src/wire/api.ts'
@@ -231,6 +231,64 @@ describe('approvals', () => {
   })
 })
 
+describe('the discussion', () => {
+  const report = (n: number) => `## Quality Gate passed\n\n**Measures**\n\nCoverage ${90 + n}.5% (${80 + n}.0% after merge)\n\nProject ID: 1234`
+  const comments: TrackerComment[] = [
+    ...[1, 2, 3, 4, 5, 6].map((n) => ({ id: `s${n}`, kind: 'comment' as const, login: 'project_42_bot_9f8e7d', name: 'Quality bot', at: `2026-11-1${n % 3}T0${n}:00:00.000Z`, body: report(n), bodyClipped: false })),
+    {
+      id: 'l1',
+      kind: 'line',
+      login: 'a.reviewer',
+      at: '2026-11-12T16:00:00.000Z',
+      body: '**Important:** Remove on a token whose save landed deletes it on screen only.\n\n- one\n- two',
+      bodyClipped: false,
+      path: 'apps/web/src/features/tokens/use-token-removal.ts',
+      url: 'https://gitlab.example.org/o/r/-/merge_requests/5#note_1',
+    },
+  ]
+  const thread = () => change({ detail: { ...change().detail!, comments, commentCount: comments.length } })
+
+  test('folds a bot\'s six reports into the newest, as one line with its gist, and shows a person\'s review comment as a card', async () => {
+    const h = host([thread()])
+    render(<Screen host={h.value} api={quietApi} />)
+    await waitFor(() => screen.getByTestId('discussion'))
+    expect(screen.getAllByTestId('folded')).toHaveLength(1)
+    expect(screen.getAllByTestId('folded-comment')).toHaveLength(1)
+    expect(screen.getByTestId('folded-gist').textContent).toBe('Quality Gate passed')
+    expect(screen.getByTestId('folded-comment').hasAttribute('data-bot')).toBe(true)
+    expect(screen.queryByTestId('folded-body')).toBeNull()
+
+    /* "5 earlier like this" opens the five before it. */
+    fireEvent.click(screen.getByTestId('earlier-like-this'))
+    expect(screen.getAllByTestId('folded-comment')).toHaveLength(6)
+    expect(screen.getByTestId('earlier-like-this').textContent).toBe('Hide the 5 earlier like this')
+
+    /* The person's comment: a card with its file as a chip and its leading word picked out. */
+    const card = screen.getByTestId('comment')
+    expect(card.querySelector('[data-testid="comment-author"]')!.textContent).toBe('a.reviewer')
+    expect(card.querySelector('[data-testid="comment-lead"]')!.textContent).toBe('Important')
+    expect(card.textContent).toContain('Remove on a token whose save landed')
+    expect(card.textContent).not.toContain('Important:')
+  })
+
+  test('the file chip shows the path short, the whole of it on hover, and opens the comment through the host', async () => {
+    const h = host([thread()])
+    render(<Screen host={h.value} api={quietApi} />)
+    const chip = await screen.findByTestId('file-chip')
+    expect(chip.textContent).toBe('apps/…/use-token-removal.ts')
+    expect(chip.getAttribute('title')).toBe('apps/web/src/features/tokens/use-token-removal.ts')
+    fireEvent.click(chip)
+    expect(h.opened).toEqual(['https://gitlab.example.org/o/r/-/merge_requests/5#note_1'])
+  })
+
+  test('a folded comment opens to its whole text with a press', async () => {
+    render(<Screen host={host([thread()]).value} api={quietApi} />)
+    const line = await screen.findByTestId('folded-comment')
+    fireEvent.click(line.querySelector('button[aria-expanded]')!)
+    expect(screen.getByTestId('folded-body').textContent).toContain('Coverage 96.5%')
+  })
+})
+
 /** A browser's observer that says what the test decides: every element is in view, or none. */
 let inView = true
 class FakeObserver {
@@ -288,15 +346,43 @@ describe('pictures', () => {
     expect(asked).toBe(new URL('/uploads/abc/shot.png', change().url).href)
   })
 
-  test('what the host will not fetch stays a link with its host shown, and opens through the host', async () => {
+  test('what the host will not fetch is its alt text once, a link naming its host on hover, opened through the host', async () => {
     imageAnswer = () => ({ outcome: 'declined', why: 'host' })
     const h = host([withBody(md('https://tracker.example.net/pixel.png'))])
     render(<Screen host={h.value} api={quietApi} />)
     const link = await screen.findByTestId('picture-link')
-    expect(link.textContent).toContain('the screenshot')
-    expect(link.parentElement!.textContent).toContain('tracker.example.net')
+    expect(link.textContent).toBe('the screenshot')
+    expect(link.parentElement!.textContent).toBe('the screenshot')
+    expect(link.getAttribute('title')).toContain('tracker.example.net')
     fireEvent.click(link)
     expect(h.opened).toEqual(['https://tracker.example.net/pixel.png'])
+  })
+
+  test('a badge that cannot be shown says its label once: inside a link it is the link\'s words, before its own label it is nothing', async () => {
+    imageAnswer = () => ({ outcome: 'declined', why: 'host' })
+    const badge = (name: string) => `[![${name}](https://sonar.example/badge/${name.replace(' ', '-')}.svg '${name}')](https://sonar.example/issues?type=${name.replace(' ', '')})`
+    const body = [
+      '![Passed](https://sonar.example/badge/passed.svg \'Passed\') **Quality Gate passed**',
+      '',
+      `${badge('New Issues')} [0 New Issues](https://sonar.example/issues?new)  `,
+      /* A decoration with no alt text, before words on its line (hard break above). */
+      "![](https://sonar.example/badge/ok.svg '') [0 Accepted issues](https://sonar.example/issues?accepted)",
+      '',
+      `Read the report: ${badge('Report')}`,
+    ].join('\n')
+    const h = host([withBody(body)])
+    const { container } = render(<Screen host={h.value} api={quietApi} />)
+    await waitFor(() => expect(container.querySelectorAll('[data-testid="picture-said"]')).toHaveLength(3))
+    const description = container.querySelector('section[aria-label="Description"]')!
+    const lines = [...description.querySelectorAll('p')].map((p) => p.textContent!.replace(/\s+/g, ' ').trim())
+    expect(lines).toEqual(['Quality Gate passed', '0 New Issues 0 Accepted issues', 'Read the report: Report'])
+    /* No link inside a link, so a browser never splits one in two. */
+    expect(description.querySelector('a a')).toBeNull()
+    expect(description.textContent).not.toContain('🖼')
+    expect(description.textContent).not.toContain('sonar.example')
+    /* The words of a badge in a link open where that link goes. */
+    fireEvent.click(await screen.findByTestId('picture-words'))
+    expect(h.opened).toEqual(['https://sonar.example/issues?type=Report'])
   })
 
   test('one too big, of the wrong type or unreadable stays a link, and an http address is never asked for', async () => {
